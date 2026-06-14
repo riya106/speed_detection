@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpeedVision – AI Traffic Speed Detection</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --border: #1e2230;
+    --accent: #00e5ff;
+    --accent2: #7c3aed;
+    --warn: #ff6b35;
+    --ok: #22c55e;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Space Grotesk', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    position: relative;
+    z-index: 1;
+    padding: 24px 40px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo-mark {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .logo-text {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .logo-text span { color: var(--accent); }
+
+  .badge {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    background: rgba(0,229,255,0.08);
+    color: var(--accent);
+    border: 1px solid rgba(0,229,255,0.2);
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+
+  main {
+    position: relative;
+    z-index: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 60px 24px 80px;
+  }
+
+  .hero {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+
+  .hero h1 {
+    font-size: clamp(32px, 6vw, 54px);
+    font-weight: 700;
+    letter-spacing: -1.5px;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+
+  .hero h1 .highlight {
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    color: var(--muted);
+    font-size: 17px;
+    max-width: 480px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* Upload zone */
+  .upload-card {
+    background: var(--surface);
+    border: 1.5px dashed var(--border);
+    border-radius: 16px;
+    padding: 48px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+
+  .upload-card:hover, .upload-card.drag-over {
+    border-color: var(--accent);
+    background: rgba(0,229,255,0.03);
+  }
+
+  .upload-card input[type=file] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    display: block;
+  }
+
+  .upload-card h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .upload-card p {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+
+  .file-types {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .file-types span {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 4px;
+    color: var(--muted);
+  }
+
+  /* File selected state */
+  .file-chosen {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0,229,255,0.06);
+    border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-top: 20px;
+    text-align: left;
+  }
+
+  .file-chosen .file-icon { font-size: 24px; }
+
+  .file-chosen .file-info { flex: 1; }
+  .file-chosen .file-name { font-weight: 600; font-size: 14px; word-break: break-all; }
+  .file-chosen .file-size { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  .btn-analyze {
+    display: block;
+    width: 100%;
+    margin-top: 20px;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #000;
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 700;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+
+  .btn-analyze:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-analyze:active { transform: translateY(0); }
+  .btn-analyze:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* Processing panel */
+  #processing-panel {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px 32px;
+    margin-top: 24px;
+  }
+
+  .proc-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .proc-header h3 { font-size: 18px; font-weight: 600; }
+  .proc-header p { font-size: 13px; color: var(--muted); font-family: var(--mono); }
+
+  .progress-bar-wrap {
+    background: var(--border);
+    border-radius: 100px;
+    height: 6px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 100px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+
+  .progress-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  /* Results panel */
+  #results-panel {
+    display: none;
+    margin-top: 24px;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+
+  .stat-card .stat-val {
+    font-size: 34px;
+    font-weight: 700;
+    font-family: var(--mono);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .stat-card .stat-val.speed { color: var(--accent); }
+  .stat-card .stat-val.warn { color: var(--warn); }
+  .stat-card .stat-val.ok { color: var(--ok); }
+
+  .stat-card .stat-label {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+
+  .legend {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .legend-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-right: 8px; }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .legend-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .btn-download {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 16px;
+    background: transparent;
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s;
+    margin-bottom: 14px;
+  }
+
+  .btn-download:hover { background: rgba(0,229,255,0.07); }
+
+  .btn-reset {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .btn-reset:hover { border-color: var(--text); color: var(--text); }
+
+  /* Error */
+  .error-box {
+    display: none;
+    background: rgba(255,59,48,0.08);
+    border: 1px solid rgba(255,59,48,0.3);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-top: 16px;
+    color: #ff6b6b;
+    font-size: 14px;
+  }
+
+  /* How it works */
+  .how-it-works {
+    margin-top: 72px;
+    text-align: center;
+  }
+
+  .section-eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .how-it-works h2 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 36px;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    text-align: left;
+  }
+
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  .step-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .step h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+  .step p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  @media (max-width: 600px) {
+    header { padding: 16px 20px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .steps { grid-template-columns: 1fr; }
+    .legend { gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">🚦</div>
+  <div class="logo-text">Speed<span>Vision</span></div>
+  <div class="badge">YOLOv8 · Powered</div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Detect Vehicle Speeds<br>with <span class="highlight">AI Precision</span></h1>
+    <p>Upload any traffic video and get an annotated output showing real-time speed estimates for every tracked vehicle.</p>
+  </div>
+
+  <!-- Upload Card -->
+  <div class="upload-card" id="drop-zone">
+    <input type="file" id="file-input" accept=".mp4,.avi,.mov,.mkv,.webm,video/mp4,video/avi,video/quicktime,video/x-matroska,video/webm">
+    <span class="upload-icon">📹</span>
+    <h2>Drop your video here</h2>
+    <p>or click to browse from your device</p>
+    <div class="file-types">
+      <span>MP4</span><span>AVI</span><span>MOV</span><span>MKV</span><span>WEBM</span>
+    </div>
+  </div>
+
+  <div class="file-chosen" id="file-chosen">
+    <span class="file-icon">🎬</span>
+    <div class="file-info">
+      <div class="file-name" id="file-name-text">—</div>
+      <div class="file-size" id="file-size-text">—</div>
+    </div>
+    <span style="color: var(--ok); font-size: 20px;">✓</span>
+  </div>
+
+  <div class="error-box" id="error-box"></div>
+
+  <button class="btn-analyze" id="btn-analyze" disabled onclick="startAnalysis()">
+    🔍 Analyze Video
+  </button>
+
+  <!-- Processing Panel -->
+  <div id="processing-panel">
+    <div class="proc-header">
+      <div class="spinner" id="spinner"></div>
+      <div>
+        <h3>Processing Video</h3>
+        <p id="proc-message">Starting up...</p>
+      </div>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progress-fill"></div>
+    </div>
+    <div class="progress-label" id="progress-label">0%</div>
+  </div>
+
+  <!-- Results Panel -->
+  <div id="results-panel">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-val ok" id="stat-vehicles">—</div>
+        <div class="stat-label">Vehicles Tracked</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val speed" id="stat-avg">—</div>
+        <div class="stat-label">Avg Speed (km/h)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val warn" id="stat-max">—</div>
+        <div class="stat-label">Max Speed (km/h)</div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span class="legend-title">Speed Legend</span>
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div> Slow (&lt; 40 km/h)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ff6b35"></div> Medium (40–80 km/h)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div> Fast (&gt; 80 km/h)</div>
+    </div>
+
+    <a class="btn-download" id="btn-download" href="#" download>
+      ⬇ Download Annotated Video
+    </a>
+    <button class="btn-reset" onclick="resetApp()">↩ Analyze Another Video</button>
+  </div>
+
+  <!-- How it works -->
+  <div class="how-it-works">
+    <div class="section-eyebrow">Under the Hood</div>
+    <h2>How It Works</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01 — DETECT</div>
+        <h3>YOLOv8 Object Detection</h3>
+        <p>Every frame is scanned using YOLOv8n to detect cars, trucks, buses, and motorcycles with high accuracy.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02 — TRACK</div>
+        <h3>Multi-Object Tracking</h3>
+        <p>Each vehicle is assigned a persistent ID across frames, letting us follow its path through the video.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03 — MEASURE</div>
+        <h3>Speed Calculation</h3>
+        <p>Pixel displacement per frame is converted to km/h using frame rate and a real-world scale factor.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  let selectedFile = null;
+  let currentJobId = null;
+  let pollInterval = null;
+
+  const fileInput = document.getElementById('file-input');
+  const dropZone = document.getElementById('drop-zone');
+  const fileChosen = document.getElementById('file-chosen');
+  const btnAnalyze = document.getElementById('btn-analyze');
+  const errorBox = document.getElementById('error-box');
+
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) selectFile(e.target.files[0]);
+  });
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
+  });
+
+  function selectFile(file) {
+    selectedFile = file;
+    document.getElementById('file-name-text').textContent = file.name;
+    document.getElementById('file-size-text').textContent = formatSize(file.size);
+    fileChosen.style.display = 'flex';
+    btnAnalyze.disabled = false;
+    hideError();
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function showError(msg) {
+    errorBox.style.display = 'block';
+    errorBox.textContent = '⚠️ ' + msg;
+  }
+
+  function hideError() {
+    errorBox.style.display = 'none';
+  }
+
+  async function startAnalysis() {
+    if (!selectedFile) return;
+    hideError();
+    btnAnalyze.disabled = true;
+
+    const formData = new FormData();
+    formData.append('video', selectedFile);
+
+    try {
+      const res = await fetch('/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      currentJobId = data.job_id;
+      showProcessingPanel();
+      pollInterval = setInterval(pollStatus, 1500);
+    } catch (err) {
+      showError(err.message || 'Upload failed. Please try again.');
+      btnAnalyze.disabled = false;
+    }
+  }
+
+  function showProcessingPanel() {
+    document.getElementById('processing-panel').style.display = 'block';
+    document.getElementById('results-panel').style.display = 'none';
+  }
+
+  async function pollStatus() {
+    try {
+      const res = await fetch(`/status/${currentJobId}`);
+      const data = await res.json();
+
+      document.getElementById('proc-message').textContent = data.message || '...';
+      const pct = data.progress || 0;
+      document.getElementById('progress-fill').style.width = pct + '%';
+      document.getElementById('progress-label').textContent = pct + '%';
+
+      if (data.status === 'done') {
+        clearInterval(pollInterval);
+        showResults(data);
+      } else if (data.status === 'error') {
+        clearInterval(pollInterval);
+        document.getElementById('processing-panel').style.display = 'none';
+        showError(data.message || 'Processing failed.');
+        btnAnalyze.disabled = false;
+      }
+    } catch (e) {
+      // keep polling
+    }
+  }
+
+  function showResults(data) {
+    document.getElementById('processing-panel').style.display = 'none';
+    const panel = document.getElementById('results-panel');
+    panel.style.display = 'block';
+
+    const s = data.stats || {};
+    document.getElementById('stat-vehicles').textContent = s.total_vehicles ?? '—';
+    document.getElementById('stat-avg').textContent = s.avg_speed != null ? s.avg_speed + '' : '—';
+    document.getElementById('stat-max').textContent = s.max_speed != null ? s.max_speed + '' : '—';
+
+    const dl = document.getElementById('btn-download');
+    dl.href = `/download/${data.output_file}`;
+  }
+
+  function resetApp() {
+    selectedFile = null;
+    currentJobId = null;
+    fileInput.value = '';
+    fileChosen.style.display = 'none';
+    btnAnalyze.disabled = true;
+    document.getElementById('processing-panel').style.display = 'none';
+    document.getElementById('results-panel').style.display = 'none';
+    document.getElementById('progress-fill').style.width = '0%';
+    document.getElementById('progress-label').textContent = '0%';
+    hideError();
+  }
+</script>
+</body>
+</html>
